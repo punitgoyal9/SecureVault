@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureVault - Auto Output Path</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style> body { font-family: 'Inter', sans-serif; } </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-6">
+
+    <div class="w-full max-w-xl bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl p-8">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="h-10 w-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">SecureVault Security</h1>
+                <p class="text-xs text-slate-400">Automatic Path Generation & C Drive Backup</p>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <!-- Input File with Browse Button -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Input File Path</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="inPath" placeholder="Click browse to select file..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors" oninput="generateOutputPath()">
+                    <button id="btnBrowseIn" onclick="browseFile('inPath', 'btnBrowseIn')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-3 rounded-xl text-sm font-medium border border-slate-700 transition-all shrink-0 cursor-pointer">Browse</button>
+                </div>
+            </div>
+
+            <!-- Output File Path (Automatic & Read-Only/Editable) -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Output File Path (Automatic)</label>
+                <input type="text" id="outPath" placeholder="Will be generated automatically..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-400 focus:outline-none focus:border-indigo-500 transition-colors">
+                <p class="text-[11px] text-slate-500 mt-1">Automatically created in the same folder as input file.</p>
+            </div>
+
+            <!-- Password -->
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Secret Password</label>
+                <input type="password" id="password" placeholder="Enter encryption/decryption key" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-4 pt-2">
+                <button onclick="runVault('enc')" class="w-full bg-indigo-600 hover:bg-indigo-500 font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-600/20 transition-all active:scale-[0.98] cursor-pointer">
+                    Encrypt File
+                </button>
+                <button onclick="runVault('dec')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-3 px-4 rounded-xl border border-slate-700 transition-all active:scale-[0.98] cursor-pointer">
+                    Decrypt File
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-6">
+            <div class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Server Output Log</div>
+            <div id="outputLog" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-400 h-20 overflow-y-auto">
+                Ready. Select an input file to begin.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const browseLocks = {};
+
+        async function browseFile(fieldId, buttonId) {
+            if (browseLocks[buttonId]) return;
+            browseLocks[buttonId] = true;
+
+            const btn = document.getElementById(buttonId);
+            const originalText = btn.innerText;
+            btn.innerText = 'Opening...';
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                const response = await fetch('/api/browse');
+                const result = await response.json();
+                if (result.success && result.filePath) {
+                    document.getElementById(fieldId).value = result.filePath;
+                    // Automatically generate output path based on selected input file
+                    generateOutputPath();
+                }
+            } catch (err) {
+                console.error("Error opening file dialog", err);
+            } finally {
+                setTimeout(() => {
+                    browseLocks[buttonId] = false;
+                    btn.innerText = originalText;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }, 1200);
+            }
+        }
+
+        // Automatically generate output path in the same directory
+        function generateOutputPath() {
+            const inPath = document.getElementById('inPath').value.trim();
+            const outPathInput = document.getElementById('outPath');
+            
+            if (!inPath) {
+                outPathInput.value = '';
+                return;
+            }
+
+            // Check if input is a vault file or regular file
+            if (inPath.toLowerCase().endsWith('.vault')) {
+                // If decrypting, remove .vault extension for the output
+                let base = inPath.slice(0, -6);
+                outPathInput.value = base; // Server will append the original extension from log.txt
+            } else {
+                // If encrypting, append .vault to the same path
+                outPathInput.value = inPath + '.vault';
+            }
+        }
+
+        async function runVault(mode) {
+            const inPath = document.getElementById('inPath').value;
+            const outPath = document.getElementById('outPath').value;
+            const password = document.getElementById('password').value;
+            const logBox = document.getElementById('outputLog');
+
+            if (!inPath || !outPath || !password) {
+                logBox.innerHTML = '<span class="text-amber-400">Warning: Please select an input file and enter a password!</span>';
+                return;
+            }
+
+            logBox.innerHTML = `<span class="text-blue-400">Processing ${mode === 'enc' ? 'encryption' : 'decryption'}...</span>`;
+
+            try {
+                const response = await fetch('/api/vault', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode, inPath, outPath, password })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    logBox.innerHTML = `<span class="text-emerald-400">${result.message}</span>`;
+                } else {
+                    logBox.innerHTML = `<span class="text-rose-400">${result.message}</span>`;
+                }
+            } catch (err) {
+                logBox.innerHTML = `<span class="text-rose-400">Network Error: Could not connect to server.</span>`;
+            }
+        }
+    </script>
+</body>
+</html>
